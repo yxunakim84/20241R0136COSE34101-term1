@@ -21,6 +21,9 @@ typedef struct {
     int turnaround_time;
     int progress_time;
     _Bool entered;
+    int order; // np_sjf
+    int preemptive; // p_sjf
+
 } Process;
 
 /**

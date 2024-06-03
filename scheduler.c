@@ -61,6 +61,14 @@ Data Dequeue(Queue *pq) {
   return retProcess;
 }
 
+Data QPeek(Queue * pq) {
+	if (IsQueueEmpty(pq)) {
+		printf("Queue Memory Error![peek]");
+		exit(-1);
+	}
+	return pq->front->data;
+}
+
 // Create Processes
 void create_processes() {
   printf("*** CPU SCHEDULER ***\n");
@@ -222,11 +230,283 @@ void FCFS() {
 }
 
 
+int compare_burst_time(const void *a, const void *b) {
+    Process *p1 = (Process *)a;
+    Process *p2 = (Process *)b;
+    return p2->burst_time - p1->burst_time;
+}
+
+
+void NP_SJF() {
+	printf("*** Non-Preemptive Shortest Job First Scheduling ***\n");
+  int selected, time, temp, i, j;
+  _NP_SJF.idle_time = 0;
+  Queue tempQ;
+  initializeProcess();
+  QueueInit(&tempQ);
+
+  // 각 프로세스의 PID와 CPU burst time 을 arr에 저장
+  int arr[10][2] = {0};
+  for(i = 0; i < process_num; i++) {
+    arr[i][0] = i;
+    arr[i][1] = processes[i]->burst_time;
+  };
+
+  // bust time 순으로 정렬
+  for (i = 0; i < process_num; i++) {
+    for (j = j + 1; j < process_num; j++) {
+      if(arr[i][1] > arr[j][1]) {
+        temp = arr[i][0]; arr[i][0] = arr[j][0]; arr[j][0] = temp;
+        temp = arr[i][1]; arr[i][1] = arr[j][1]; arr[j][1] = temp;
+      }
+    }
+  }
+
+  // process order
+  for(i = 0; i < process_num; i++) {
+    for (j = 0; j <process_num; j++) {
+      if(processes[i]->pid == arr[j][0]) {
+        processes[i]->order = j;
+      }
+    }
+  }
+
+  for(time = 0; _NP_SJF.finished_process != process_num; time++) {
+    for(i = 0; i < process_num; i++) {
+      if(waiting_queue[i] > 0) {
+        waiting_queue[i]--;
+      }
+      if(waiting_queue[i] == 0 || time == processes[i]->arrival_time) {
+        if(waiting_queue[i] == 0) {
+          waiting_queue[i]--;
+        }
+        if(IsQueueEmpty(&ready_queue)) {
+          Enqueue(&ready_queue, processes[i]->pid);
+        }
+        // 임시 큐를 사용하여 적절한 위치에 프로세스를 삽입한 후 다시 원래 큐로 복원
+        else {
+          while (processes[QPeek(&ready_queue)]->order < processes[i]->order) {
+            Enqueue(&tempQ, Dequeue(&ready_queue));
+            if(IsQueueEmpty(&ready_queue)) break;
+          }
+          Enqueue(&tempQ, processes[i]->pid);
+          while (!IsQueueEmpty(&ready_queue)) {
+            Enqueue(&tempQ, Dequeue(&ready_queue));
+          }
+          while (!IsQueueEmpty(&tempQ)) {
+            Enqueue(&ready_queue, Dequeue(&tempQ));
+          }
+        }
+      }
+    }
+
+    if(!IsQueueEmpty(&ready_queue) && IsQueueEmpty(&running_queue)) {
+      selected = Dequeue(&ready_queue);
+      Enqueue(&running_queue, selected);
+      processes[selected]->entered = TRUE;
+    }
+
+    /**
+     * i/o 상태일 때 ready queue 에 있는 프로세스 실행. ready queue 에 하나도 없으면 cpu는 idle 상태
+    */
+    if (IsQueueEmpty(&running_queue)) { 
+      printf("TIME %d ~ %d\t: IDLE\n", time, time + 1); _NP_SJF.idle_time++;
+    } 
+    else {
+      printf("TIME %d ~ %d\t: P[%d] / [%s] \n", time, time + 1, processes[selected]->pid, processes[selected]->entered == TRUE ? "✓" : " ");
+      if(processes[selected]->entered == TRUE) {
+        processes[selected]->entered = FALSE;
+      }
+      processes[selected]->progress_time++;
+
+    
+			if (processes[selected]->progress_time == processes[selected]->io_start_time) {
+				int waiting = Dequeue(&running_queue);
+				waiting_queue[waiting] = processes[waiting]->io_burst_time + 1;
+			}
+			else if (processes[selected]->progress_time == processes[selected]->burst_time) {
+				_NP_SJF.finished_process++;
+				processes[Dequeue(&running_queue)]->completed_time = time + 1;
+			}
+    }
+  }
+
+  _NP_SJF.finished_time = time;
+
+   // Evaluation
+  int total_turnaround_time = 0, total_burst_time = 0;
+  for(int i = 0; i < process_num; i++) {
+    total_turnaround_time += processes[i]->completed_time - processes[i]->arrival_time;
+    total_burst_time += processes[i]->burst_time;
+  }
+  _NP_SJF.avg_turnaround_time = (float)total_turnaround_time / process_num;
+  _NP_SJF.avg_waiting_time = (float)(total_turnaround_time - total_burst_time) / process_num;
+
+
+	printf("\n* Average Waiting Time = %.4f", _NP_SJF.avg_waiting_time);
+	printf("\n* Average Turnaround Time = %.4f\n", _NP_SJF.avg_turnaround_time);
+	printf("*****************************************************************************\n\n");
+}
+
+void P_SJF() {
+  printf("*** Preemptive Shortest Job First Scheduling ***\n");
+  int selected, time, preempted, i, j;
+  _P_SJF.idle_time = 0;
+  _P_SJF.finished_process = 0;
+  Queue tempQ;
+  initializeProcess();
+  QueueInit(&tempQ);
+  
+  for(time = 0; _P_SJF.finished_process != process_num; time++) {
+    for(i = 0; i < process_num; i++) {
+      if(waiting_queue[i] > 0) {
+        waiting_queue[i]--;
+      }
+
+      if(waiting_queue[i] == 0 || time == processes[i]->arrival_time) {
+        if(waiting_queue[i] == 0) {
+          waiting_queue[i]--;
+        }
+
+        if(IsQueueEmpty(&ready_queue) && IsQueueEmpty(&running_queue)) {
+          Enqueue(&ready_queue, processes[i]->pid);
+        }
+        // 선점 로직
+        else if(!IsQueueEmpty(&running_queue)) {
+          // 현재 진행중인 프로세스의 remaining burst time 보다 다른 프로세스의 remaining burst time 이 더 적은 경우 선점
+          if(processes[i]->remaining_time < processes[QPeek(&running_queue)]->remaining_time) {
+            preempted = Dequeue(&running_queue);
+            while (!IsQueueEmpty(&ready_queue))
+            {
+             Enqueue(&tempQ, Dequeue(&ready_queue));
+            }
+            Enqueue(&ready_queue, preempted);
+            while (!IsQueueEmpty(&tempQ))
+            {
+              Enqueue(&ready_queue, Dequeue(&tempQ));
+            }
+            // -> 선점 후 ready queue에 있던 나머지 프로세스들 다시 넣어주는 것
+            // 현재 더 우선순위의 프로세스를 running queue 에 넣어줌
+            Enqueue(&running_queue, i);
+            processes[i]->entered = TRUE;
+
+            if(processes[preempted]->preemptive == 1) {
+              processes[preempted]->preemptive = 0;
+            }
+          }
+          else {
+            if(IsQueueEmpty(&ready_queue)) {
+              Enqueue(&ready_queue, i);
+            }
+            // 현재 작업중인 프로세스보다는 후순위인데, ready queue 에서 순서 조정이 다시 필요
+            else {
+              while (processes[QPeek(&ready_queue)]->remaining_time < processes[i]->remaining_time) {
+                Enqueue(&tempQ, Dequeue(&ready_queue));
+                if(IsQueueEmpty(&ready_queue)) {
+                  break;
+                }
+              }
+              // ready queue 보다 우선순위이면 temp 에 넣어주기
+              Enqueue(&tempQ, processes[i]->pid);
+              // 나머지 프로세스들 tempQ로 이동
+              while (!IsQueueEmpty(&ready_queue)) {
+                Enqueue(&tempQ, Dequeue(&ready_queue));
+              }
+              // tempQ에서 다시 ready queue 로 이동
+              while(!IsQueueEmpty(&tempQ)) {
+                Enqueue(&ready_queue, Dequeue(&tempQ));
+              }
+            }
+          }
+        }
+
+        // ready queue 에는 값이 있고 running queue 에는 값이 없을 때
+        // ready queue 우선순위로 정렬
+        else {
+          while(processes[QPeek(&ready_queue)]->remaining_time < processes[i]->remaining_time) {
+            Enqueue(&tempQ, Dequeue(&ready_queue));
+            if(IsQueueEmpty(&ready_queue)) break;
+          };
+          Enqueue(&tempQ, processes[i]->pid);
+          // 나머지 프로세스들 tempQ로 이동
+          while (!IsQueueEmpty(&ready_queue)) {
+            Enqueue(&tempQ, Dequeue(&ready_queue));
+          }
+          // tempQ에서 다시 ready queue 로 이동
+          while(!IsQueueEmpty(&tempQ)) {
+            Enqueue(&ready_queue, Dequeue(&tempQ));
+          }
+        }
+      }
+    }
+
+    if(!IsQueueEmpty(&running_queue)) {
+      selected = QPeek(&running_queue);
+    }
+
+    if(!IsQueueEmpty(&ready_queue) && IsQueueEmpty(&running_queue)) {
+      selected = Dequeue(&ready_queue);
+      Enqueue(&running_queue, selected);
+      processes[selected]->entered = TRUE;
+      processes[selected]->preemptive = 1;
+    }
+    
+    /**
+     * i/o 상태일 때 ready queue 에 있는 프로세스 실행. ready queue 에 하나도 없으면 cpu는 idle 상태
+    */
+    if (IsQueueEmpty(&running_queue)) { 
+      printf("TIME %d ~ %d\t: IDLE\n", time, time + 1); _P_SJF.idle_time++;
+    } 
+    else {
+      printf("TIME %d ~ %d\t: P[%d] / [%s] \n", time, time + 1, processes[selected]->pid, processes[selected]->entered == TRUE ? "✓" : " ");
+      if(processes[selected]->entered == TRUE) {
+        processes[selected]->entered = FALSE;
+      }
+      processes[selected]->remaining_time--;
+      processes[selected]->progress_time++;
+
+    
+			if (processes[selected]->progress_time == processes[selected]->io_start_time) {
+				int waiting = Dequeue(&running_queue);
+				waiting_queue[waiting] = processes[waiting]->io_burst_time + 1;
+			}
+			else if (processes[selected]->progress_time == processes[selected]->burst_time) {
+				_P_SJF.finished_process++;
+				processes[Dequeue(&running_queue)]->completed_time = time + 1;
+			}
+    }
+  }
+
+  _P_SJF.finished_time = time;
+
+  // Evaluation
+  int total_turnaround_time = 0, total_burst_time = 0;
+  for(int i = 0; i < process_num; i++) {
+    total_turnaround_time += processes[i]->completed_time - processes[i]->arrival_time;
+    total_burst_time += processes[i]->burst_time;
+  }
+  _P_SJF.avg_turnaround_time = (float)total_turnaround_time / process_num;
+  _P_SJF.avg_waiting_time = (float)(total_turnaround_time - total_burst_time) / process_num;
+
+
+	printf("\n* Average Waiting Time = %.4f", _P_SJF.avg_waiting_time);
+	printf("\n* Average Turnaround Time = %.4f\n", _P_SJF.avg_turnaround_time);
+	printf("*****************************************************************************\n\n");
+}
+
 
 int main() {
     create_processes();
     initializeQueue();
-    FCFS();
+    // FCFS();
+
+    // Non-preemptive SJF
+    // NP_SJF();
+    
+    // Preemptive SJF
+    P_SJF();
+
+    // SJF(true);
 
     return 0;
 }
