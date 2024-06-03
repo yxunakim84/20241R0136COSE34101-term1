@@ -23,7 +23,7 @@ typedef struct {
     _Bool entered;
     int order; // np_sjf
     int preemptive; // p_sjf
-
+    int time_quantum; // RR
 } Process;
 
 /**
