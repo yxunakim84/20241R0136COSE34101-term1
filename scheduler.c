@@ -494,6 +494,95 @@ void P_SJF() {
 	printf("*****************************************************************************\n\n");
 }
 
+/**
+ * NP_PRIORITY
+*/
+void NP_PRIORITY() {
+  printf("*** Non-Preemptive Priority Scheduling ***\n");
+  int selected, time, i;
+  _NP_PRIORITY.idle_time = 0;
+  _NP_PRIORITY.finished_process = 0;
+  Queue tempQ;
+  initializeProcess();
+  QueueInit(&tempQ);
+
+  for(time = 0; _NP_PRIORITY.finished_process != process_num; time++) {
+    for(i = 0; i < process_num; i++) {
+        if(waiting_queue[i] > 0) {
+        waiting_queue[i]--;
+      }
+
+      if(waiting_queue[i] == 0 || time == processes[i]->arrival_time) {
+        if(waiting_queue[i] == 0) {
+          waiting_queue[i]--;
+        }
+
+        if(IsQueueEmpty(&ready_queue)) {
+          Enqueue(&ready_queue, processes[i]->pid);
+        }
+        else {
+          // ready queue 에서 현재 프로세스보다 우선순위 높은 것들 먼저 넣기
+          while (processes[QPeek(&ready_queue)]->priority < processes[i]->priority) {
+            Enqueue(&tempQ, Dequeue(&ready_queue));
+            if(IsQueueEmpty(&ready_queue)) {
+              break;
+            }
+          }
+          // 현재 프로세스 넣기
+          Enqueue(&tempQ, processes[i]->pid);
+          // 현재 프로세스보다 우선순위 낮은 나머지 프로세스들 넣기
+          while (!IsQueueEmpty(&ready_queue)) {
+            Enqueue(&tempQ, Dequeue(&ready_queue));
+          }
+          while (!IsQueueEmpty(&tempQ)) {
+            Enqueue(&ready_queue, Dequeue(&tempQ));
+          }
+        }
+      }
+    }
+    if(!IsQueueEmpty(&ready_queue) && IsQueueEmpty(&running_queue)) {
+      selected = Dequeue(&ready_queue);
+      Enqueue(&running_queue, selected);
+      processes[selected]->entered = TRUE;
+    }
+    if(IsQueueEmpty(&running_queue)) {
+      printf("TIME %d ~ %d\t: IDLE\n", time, time + 1); _NP_PRIORITY.idle_time++;
+    }
+    else {
+      printf("TIME %d ~ %d\t: P[%d] / [%s] \n", time, time + 1, processes[selected]->pid, processes[selected]->entered == TRUE ? "✓" : " ");
+      if(processes[selected]->entered == TRUE) {
+        processes[selected]->entered = FALSE;
+      }
+      processes[selected]->progress_time++;
+
+    
+      if (processes[selected]->progress_time == processes[selected]->io_start_time) {
+        int waiting = Dequeue(&running_queue);
+        waiting_queue[waiting] = processes[waiting]->io_burst_time + 1;
+      }
+      else if (processes[selected]->progress_time == processes[selected]->burst_time) {
+        _NP_PRIORITY.finished_process++;
+        processes[Dequeue(&running_queue)]->completed_time = time + 1;
+      }
+    }
+  }
+  _NP_PRIORITY.finished_time = time;
+
+  // Evaluation
+  int total_turnaround_time = 0, total_burst_time = 0;
+  for(int i = 0; i < process_num; i++) {
+    total_turnaround_time += processes[i]->completed_time - processes[i]->arrival_time;
+    total_burst_time += processes[i]->burst_time;
+  }
+  _NP_PRIORITY.avg_turnaround_time = (float)total_turnaround_time / process_num;
+  _NP_PRIORITY.avg_waiting_time = (float)(total_turnaround_time - total_burst_time) / process_num;
+
+
+	printf("\n* Average Waiting Time = %.4f", _NP_PRIORITY.avg_waiting_time);
+	printf("\n* Average Turnaround Time = %.4f\n", _NP_PRIORITY.avg_turnaround_time);
+	printf("*****************************************************************************\n\n");
+}
+
 
 int main() {
     create_processes();
@@ -504,9 +593,10 @@ int main() {
     // NP_SJF();
     
     // Preemptive SJF
-    P_SJF();
+    // P_SJF();
 
-    // SJF(true);
+    NP_PRIORITY();
+
 
     return 0;
 }
