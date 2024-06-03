@@ -889,28 +889,57 @@ void ROUND_ROBIN() {
   printf("*****************************************************************************\n\n");
 }
 
-
+void evaluation() {
+	printf("***Evaluation of each scheduling algorithms***\n");
+	printf("-----------------------------------------------------------------------------\n");
+	printf("1. FCFS Scheduling\n");
+	printf("Average Waiting Time = %.4f, Average Turnaround Time = %.4f\n", _FCFS.avg_waiting_time, _FCFS.avg_turnaround_time);
+	printf("CPU Utilization = %.2f%%\n", (float)((_FCFS.finished_time - _FCFS.idle_time) * 100) / _FCFS.finished_time);
+	printf("-----------------------------------------------------------------------------\n");
+	printf("2. Non-Preemptive SJF Scheduling\n");
+	printf("Average Waiting Time = %.4f, Average Turnaround Time = %.4f\n", _NP_SJF.avg_waiting_time, _NP_SJF.avg_turnaround_time);
+	printf("CPU Utilization = %.2f%%\n", (float)((_NP_SJF.finished_time - _NP_SJF.idle_time) * 100) / _NP_SJF.finished_time);
+	printf("-----------------------------------------------------------------------------\n");
+	printf("3. Preemptive SJF Scheduling\n");
+	printf("Average Waiting Time = %.4f, Average Turnaround Time = %.4f\n", _P_SJF.avg_waiting_time, _P_SJF.avg_turnaround_time);
+	printf("CPU Utilization = %.2f%%\n", (float)((_P_SJF.finished_time - _P_SJF.idle_time) * 100) / _P_SJF.finished_time);
+	printf("-----------------------------------------------------------------------------\n");
+	printf("4. Non-Preemptive Priority Scheduling\n");
+	printf("Average Waiting Time = %.4f, Average Turnaround Time = %.4f\n", _NP_PRIORITY.avg_waiting_time, _NP_PRIORITY.avg_turnaround_time);
+	printf("CPU Utilization = %.2f%%\n", (float)((_NP_PRIORITY.finished_time - _NP_PRIORITY.idle_time) * 100) / _NP_PRIORITY.finished_time);
+	printf("-----------------------------------------------------------------------------\n");
+	printf("5. Preemptive Priority Scheduling\n");
+	printf("Average Waiting Time = %.4f, Average Turnaround Time = %.4f\n", _P_PRIORITY.avg_waiting_time, _P_PRIORITY.avg_turnaround_time);
+	printf("CPU Utilization = %.2f%%\n", (float)((_P_PRIORITY.finished_time - _P_PRIORITY.idle_time) * 100) / _P_PRIORITY.finished_time);
+	printf("-----------------------------------------------------------------------------\n");
+	printf("6. Round-Robin Scheduling\n");
+	printf("Average Waiting Time = %.4f, Average Turnaround Time = %.4f\n", _ROUND_ROBIN.avg_waiting_time, _ROUND_ROBIN.avg_turnaround_time);
+	printf("CPU Utilization = %.2f%%\n", (float)((_ROUND_ROBIN.finished_time - _ROUND_ROBIN.idle_time) * 100) / _ROUND_ROBIN.finished_time);
+	printf("-----------------------------------------------------------------------------\n");
+	}
 
 int main() {
     create_processes();
     Config();
 
     // First-Come First-Served
-    // FCFS();
+    FCFS();
 
     // Non-preemptive SJF
-    // NP_SJF();
+    NP_SJF();
     // Preemptive SJF
-    // P_SJF();
+    P_SJF();
 
     // Non-preemptive Priority
-    // NP_PRIORITY();
+    NP_PRIORITY();
     // Preemptive Priority
-    // P_PRIORITY();
+    P_PRIORITY();
 
     // Round-Robin
     ROUND_ROBIN();
 
+    // Evaluation
+    evaluation();
 
     return 0;
 }
